@@ -40,7 +40,7 @@ export default function ParentPage() {
       supabase.from('daily_words').select('word_date').order('word_date', { ascending: false }),
     ])
 
-    const uniqueDates = [...new Set((wData || []).map((w: { word_date: string }) => w.word_date))]
+    const uniqueDates = Array.from(new Set((wData || []).map((w: { word_date: string }) => w.word_date)))
     setStudent(s)
     setSubs((subData || []) as SubRow[])
     setWordDates(uniqueDates)
