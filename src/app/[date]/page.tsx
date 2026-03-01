@@ -1,0 +1,187 @@
+'use client'
+import { useState, useEffect, useCallback } from 'react'
+import { useParams } from 'next/navigation'
+import { supabase, slugToDate, type QuizQuestion, type Student } from '@/lib/supabase'
+import { Ring } from '@/components/Ring'
+import { Avatar } from '@/components/Avatar'
+
+type Phase = 'id' | 'quiz' | 'done'
+
+export default function QuizPage() {
+  const params = useParams()
+  const slug = params.date as string
+  const dateKey = slugToDate(slug)
+  const mm = slug?.slice(0, 2)
+  const dd = slug?.slice(2, 4)
+
+  const [phase, setPhase]         = useState<Phase>('id')
+  const [sid, setSid]             = useState('')
+  const [student, setStudent]     = useState<Student | null>(null)
+  const [questions, setQuestions] = useState<QuizQuestion[]>([])
+  const [answers, setAnswers]     = useState<Record<number, string>>({})
+  const [qi, setQi]               = useState(0)
+  const [revealed, setRevealed]   = useState(false)
+  const [score, setScore]         = useState(0)
+  const [err, setErr]             = useState('')
+  const [busy, setBusy]           = useState(false)
+  const [already, setAlready]     = useState(false)
+
+  const start = useCallback(async () => {
+    setBusy(true); setErr('')
+    const { data: students } = await supabase.from('students').select('*').eq('id', sid)
+    if (!students?.length) {
+      setErr('Student ID not found. Ask your teacher to register you.'); setBusy(false); return
+    }
+    const s = students[0] as Student
+
+    const { data: prevSub } = await supabase
+      .from('submissions').select('score').eq('student_id', sid).eq('form_date', dateKey)
+    if (prevSub?.length) {
+      setScore(prevSub[0].score); setStudent(s)
+      setAlready(true); setPhase('done'); setBusy(false); return
+    }
+
+    const { data: forms } = await supabase.from('question_forms').select('questions').eq('form_date', dateKey)
+    if (!forms?.length) {
+      setErr('No quiz found for this date. Ask your teacher to publish words first.'); setBusy(false); return
+    }
+
+    setStudent(s)
+    setQuestions(forms[0].questions as QuizQuestion[])
+    setPhase('quiz')
+    setBusy(false)
+  }, [sid, dateKey])
+
+  const pick = (opt: string) => { if (revealed) return; setAnswers(p => ({ ...p, [qi]: opt })) }
+
+  const next = async () => {
+    setRevealed(false)
+    if (qi + 1 < questions.length) { setQi(q => q + 1); return }
+    setBusy(true)
+    let s = 0
+    questions.forEach((q, i) => { if (answers[i] === q.correct_answer) s++ })
+    setScore(s)
+    await supabase.from('submissions').insert([{
+      student_id: sid, form_date: dateKey, answers, score: s, total: questions.length,
+    }])
+    setPhase('done')
+    setBusy(false)
+  }
+
+  const q = questions[qi]
+  const pct = questions.length ? Math.round((score / questions.length) * 100) : 0
+  const scoreColor = pct >= 80 ? 'var(--emerald)' : pct >= 60 ? 'var(--gold)' : 'var(--danger)'
+
+  return (
+    <div style={{ maxWidth: 540, margin: '0 auto', padding: '32px 20px' }} className="au">
+
+      {/* ── ENTER ID ── */}
+      {phase === 'id' && (
+        <div className="card">
+          <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>📋 Word Quiz</h1>
+          <div style={{ color: 'var(--sub)', fontSize: 13, marginBottom: 24 }}>
+            Date: <strong style={{ color: 'var(--text)' }}>{mm}/{dd}</strong> · Enter your Student ID to begin
+          </div>
+          {err && <div className="err-box">{err}</div>}
+          <label>Student ID</label>
+          <input className="input" placeholder="e.g. STU-001" value={sid}
+            onChange={e => setSid(e.target.value.toUpperCase())}
+            onKeyDown={e => e.key === 'Enter' && sid && start()}
+            style={{ marginBottom: 20 }} />
+          <button className="btn btn-p" style={{ width: '100%' }} onClick={start} disabled={busy || !sid}>
+            {busy ? <span className="spin">⟳</span> : 'Start Quiz →'}
+          </button>
+        </div>
+      )}
+
+      {/* ── QUIZ ── */}
+      {phase === 'quiz' && q && student && (
+        <div className="au">
+          {/* Student bar */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <span className="badge bp">Q {qi + 1} / {questions.length}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13, color: 'var(--sub)' }}>{student.name}</span>
+              <Avatar studentId={student.id} name={student.name} avatarUrl={student.avatar_url} size={32} editable={false} />
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div style={{ height: 4, background: '#1A1D2E', borderRadius: 2, marginBottom: 24 }}>
+            <div style={{ height: '100%', background: 'var(--accent)', borderRadius: 2, width: `${(qi / questions.length) * 100}%`, transition: 'width .4s' }} />
+          </div>
+
+          {/* Question */}
+          <div className="card" style={{ marginBottom: 18, borderColor: 'rgba(124,92,252,.35)' }}>
+            <div style={{ fontSize: 11, color: 'var(--accent-lt)', fontWeight: 700, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.5px' }}>📖 {q.word}</div>
+            <div style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.55 }}>{q.question}</div>
+          </div>
+
+          {/* Options */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+            {q.options.map((opt, i) => {
+              let cls = 'opt'
+              if (revealed) {
+                if (opt === q.correct_answer) cls += ' ok'
+                else if (opt === answers[qi]) cls += ' bad'
+              } else if (answers[qi] === opt) cls += ' sel'
+              return (
+                <button key={i} className={cls} disabled={revealed} onClick={() => pick(opt)}>
+                  <span style={{ color: 'var(--sub)', marginRight: 10 }}>{String.fromCharCode(65 + i)}.</span>{opt}
+                </button>
+              )
+            })}
+          </div>
+
+          <div style={{ marginTop: 18 }}>
+            {!revealed
+              ? <button className="btn btn-p" style={{ width: '100%' }} disabled={!answers[qi]} onClick={() => setRevealed(true)}>Check Answer</button>
+              : <button className="btn btn-g" style={{ width: '100%' }} onClick={next} disabled={busy}>
+                  {busy ? <span className="spin">⟳</span> : qi + 1 < questions.length ? 'Next Question →' : 'See Results 🎉'}
+                </button>
+            }
+          </div>
+        </div>
+      )}
+
+      {/* ── RESULTS ── */}
+      {phase === 'done' && student && (
+        <div className="card au" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>
+            {pct >= 80 ? '🏆' : pct >= 60 ? '👍' : '📚'}
+          </div>
+
+          {/* Student photo + name */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+            <Avatar studentId={student.id} name={student.name} avatarUrl={student.avatar_url} size={88} editable={false} />
+            <div>
+              <h2 style={{ fontSize: 22, fontWeight: 800 }}>{already ? 'Already Submitted!' : 'Quiz Complete!'}</h2>
+              <div style={{ color: 'var(--sub)', fontSize: 14, marginTop: 2 }}>{student.name} · {mm}/{dd}</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
+            <Ring pct={pct} size={140} color={scoreColor} label={`${score}/${questions.length || 5}`} sub="score" />
+          </div>
+
+          <div style={{ background: 'var(--bg)', borderRadius: 14, padding: '16px 20px', marginBottom: 24, textAlign: 'left' }}>
+            {[
+              ['Correct answers', score, 'var(--emerald)'],
+              ['Total questions', questions.length || 5, 'var(--text)'],
+              ['Percentage', `${pct}%`, scoreColor],
+            ].map(([l, v, c]) => (
+              <div key={String(l)} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ color: 'var(--sub)', fontSize: 13 }}>{l}</span>
+                <strong style={{ color: String(c) }}>{v}</strong>
+              </div>
+            ))}
+          </div>
+
+          <a href="/parent" className="btn btn-g" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+            👨‍👩‍👧 View Full Progress
+          </a>
+        </div>
+      )}
+    </div>
+  )
+}
