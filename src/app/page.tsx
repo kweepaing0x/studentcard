@@ -1,4 +1,5 @@
 'use client'
+import { AdminLoginGate } from '@/components/AdminAuth'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, type DailyWord, type Student } from '@/lib/supabase'
 import { Avatar } from '@/components/Avatar'
@@ -7,7 +8,7 @@ import { useToast } from '@/components/Toast'
 type WordEntry = { english: string; myanmar: string }
 type WordsByDate = Record<string, DailyWord[]>
 
-export default function AdminPage() {
+function AdminContent() {
   const [tab, setTab] = useState<'publish' | 'history' | 'students'>('publish')
   const [wordDate, setWordDate] = useState(() => new Date().toISOString().split('T')[0])
   const [words, setWords] = useState<WordEntry[]>(Array(5).fill(null).map(() => ({ english: '', myanmar: '' })))
@@ -215,5 +216,13 @@ export default function AdminPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function AdminPage() {
+  return (
+    <AdminLoginGate>
+      <AdminContent />
+    </AdminLoginGate>
   )
 }
