@@ -202,8 +202,8 @@ export default function ParentPage() {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 <Avatar studentId={student.id} name={student.name} avatarUrl={student.avatar_url} size={68} editable={false} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h2 style={{ fontSize: 18, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{student.name}</h2>
+                <div style={{ flex: 1 }}>
+                  <h2 style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.3 }}>{student.name}</h2>
                   <div style={{ color: 'var(--sub)', fontSize: 13, marginTop: 2 }}>{t.parent}: {student.parent_name}</div>
                   <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <span className="badge bp">🪪 {student.id}</span>
@@ -211,7 +211,6 @@ export default function ParentPage() {
                     <span className="badge bgo">✏️ {subs.length}</span>
                   </div>
                 </div>
-                <Ring pct={pct} size={64} color={scoreColor} label={`${pct}%`} sub="score" />
               </div>
             </div>
 
