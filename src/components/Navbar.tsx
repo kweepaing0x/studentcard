@@ -4,6 +4,12 @@ import { usePathname } from 'next/navigation'
 
 export function Navbar() {
   const path = usePathname()
+
+  // Hide navbar on parent portal and quiz pages (mobile-first, no admin access)
+  const isQuizPage = /^\/\d{4}$/.test(path)   // matches /0301, /0302, etc.
+  const isParentPage = path === '/parent'
+  if (isQuizPage || isParentPage) return null
+
   const today = new Date()
   const mm = String(today.getMonth() + 1).padStart(2, '0')
   const dd = String(today.getDate()).padStart(2, '0')
@@ -26,8 +32,7 @@ export function Navbar() {
       </Link>
       <div style={{ display: 'flex', gap: 4 }}>
         <Link href={todaySlug} className={`nav-link ${path === todaySlug ? 'active' : ''}`}>✏️ Quiz</Link>
-        <Link href="/parent"  className={`nav-link ${path === '/parent'  ? 'active' : ''}`}>👨‍👩‍👧 Parent</Link>
-        <Link href="/"        className={`nav-link ${path === '/'        ? 'active' : ''}`}>⚙️ Admin</Link>
+        <Link href="/parent"   className={`nav-link ${path === '/parent'   ? 'active' : ''}`}>👨‍👩‍👧 Parent</Link>
       </div>
     </nav>
   )
