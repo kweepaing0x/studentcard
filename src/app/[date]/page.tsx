@@ -7,6 +7,16 @@ import { Avatar } from '@/components/Avatar'
 
 type Phase = 'id' | 'quiz' | 'done'
 
+// Helper function to shuffle array
+const shuffleArray = <T,>(array: T[]): T[] => {
+  const shuffled = [...array]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled
+}
+
 export default function QuizPage() {
   const params = useParams()
   const slug = params.date as string
@@ -18,6 +28,7 @@ export default function QuizPage() {
   const [sid, setSid]             = useState('')
   const [student, setStudent]     = useState<Student | null>(null)
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
+  const [shuffledQuestions, setShuffledQuestions] = useState<Array<QuizQuestion & { shuffled_options: string[] }>>([])
   const [answers, setAnswers]     = useState<Record<number, string>>({})
   const [qi, setQi]               = useState(0)
   const [revealed, setRevealed]   = useState(false)
@@ -46,8 +57,16 @@ export default function QuizPage() {
       setErr('No quiz found for this date. Ask your teacher to publish words first.'); setBusy(false); return
     }
 
+    const rawQuestions = forms[0].questions as QuizQuestion[]
+    // Shuffle options for each question
+    const shuffled = rawQuestions.map(q => ({
+      ...q,
+      shuffled_options: shuffleArray(q.options)
+    }))
+
     setStudent(s)
-    setQuestions(forms[0].questions as QuizQuestion[])
+    setQuestions(rawQuestions)
+    setShuffledQuestions(shuffled)
     setPhase('quiz')
     setBusy(false)
   }, [sid, dateKey])
@@ -68,7 +87,7 @@ export default function QuizPage() {
     setBusy(false)
   }
 
-  const q = questions[qi]
+  const q = shuffledQuestions[qi]
   const pct = questions.length ? Math.round((score / questions.length) * 100) : 0
   const scoreColor = pct >= 80 ? 'var(--emerald)' : pct >= 60 ? 'var(--gold)' : 'var(--danger)'
 
@@ -119,7 +138,7 @@ export default function QuizPage() {
 
           {/* Options */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-            {q.options.map((opt, i) => {
+            {q.shuffled_options.map((opt, i) => {
               let cls = 'opt'
               if (revealed) {
                 if (opt === q.correct_answer) cls += ' ok'
