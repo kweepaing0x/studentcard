@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { Navbar } from '@/components/Navbar'
+import Script from 'next/script'
 
 export const metadata: Metadata = {
   title: 'WordSmart – Myanmar English Learning',
@@ -13,6 +14,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <Navbar />
         <main>{children}</main>
+        <Script
+          src="//libtl.com/sdk.js"
+          data-zone="10753145"
+          data-sdk="show_10753145"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   )
